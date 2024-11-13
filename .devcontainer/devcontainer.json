@@ -4,7 +4,7 @@
 	"name": "Kos_Stable_Codespace",
 		
 	// Either use a pre-built image (= a Docker container)...
-	"image": "ghcr.io/kos-builds/kos-ports-dc:sha-656a397-14.1.0", //available from 
+	"image": "ghcr.io/kos-builds/kos-ports-dc:latest-stable", //available from 
 	// ... or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	//"build": { // Path is relative to the devcontainer.json file.
 	//    "dockerfile": "Dockerfile"
