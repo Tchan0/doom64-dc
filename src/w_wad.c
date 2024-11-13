@@ -61,16 +61,17 @@ void *pnon_enemy;
 pvr_ptr_t pvr_non_enemy;
 pvr_poly_cxt_t pvr_sprite_cxt;
 pvr_poly_hdr_t pvr_sprite_hdr;
+pvr_poly_hdr_t pvr_sprite_hdr_nofilter;
 
-const char *fnpre = "/cd";
+// see doomdef.h
+const char *fnpre = STORAGE_PREFIX;
 
 char fnbuf[256];
-extern uint8_t __attribute__((aligned(32))) op_buf[VERTBUF_SIZE];
-extern uint8_t __attribute__((aligned(32))) tr_buf[VERTBUF_SIZE];
+extern uint8_t __attribute__((aligned(32))) op_buf[OP_VERTBUF_SIZE];
+extern uint8_t __attribute__((aligned(32))) tr_buf[TR_VERTBUF_SIZE];
 
-uint16_t *printtex;//[12*24*20];
+uint16_t *printtex;
 pvr_ptr_t dlstex;
-// LOADING DOOM64 IWAD
 
 void W_DrawLoadScreen(char *what, int current, int total) {
 #if REAL_SCREEN_WD == 640
@@ -111,7 +112,7 @@ void W_DrawLoadScreen(char *what, int current, int total) {
 		vert->y = (((REAL_SCREEN_HT/2) - 16));
 		vert->z = 4.9f;
 		vert->u = 0.0f;
-		vert->v = 24.0f / 32.0f;//1.0f;
+		vert->v = 24.0f / 32.0f;
 		vert->argb = 0xffffffff;
 		vert++;
 		vert->flags = PVR_CMD_VERTEX;
@@ -128,7 +129,7 @@ void W_DrawLoadScreen(char *what, int current, int total) {
 		vert->y = (((REAL_SCREEN_HT/2) - 16));
 		vert->z = 4.9f;
 		vert->u = 1.0f;
-		vert->v = 24.0f / 32.0f;//1.0f;
+		vert->v = 24.0f / 32.0f;
 		vert->argb = 0xffffffff;
 		vert++;
 
@@ -227,8 +228,8 @@ void W_DrawLoadScreen(char *what, int current, int total) {
 
 		vid_waitvbl();
 		pvr_scene_begin();
-		pvr_set_vertbuf(PVR_LIST_OP_POLY, op_buf, VERTBUF_SIZE);
-		pvr_set_vertbuf(PVR_LIST_TR_POLY, tr_buf, VERTBUF_SIZE);
+		pvr_set_vertbuf(PVR_LIST_OP_POLY, op_buf, OP_VERTBUF_SIZE);
+		pvr_set_vertbuf(PVR_LIST_TR_POLY, tr_buf, TR_VERTBUF_SIZE);
 
 		pvr_list_prim(PVR_LIST_OP_POLY, &load_hdr, sizeof(pvr_poly_hdr_t));
 		pvr_list_prim(PVR_LIST_OP_POLY, &txtverts, sizeof(txtverts));	
@@ -243,92 +244,106 @@ void W_DrawLoadScreen(char *what, int current, int total) {
 #endif
 }
 
-
 void W_Init (void)
 {
 	wadinfo_t *wadfileptr;
 	wadinfo_t *s2_wadfileptr;
 	int infotableofs;
 	int s2_infotableofs;
-
 	short *pal1;
+	short *pal2;
+
+	W_DrawLoadScreen("Palettes", 0, 100);
+	timer_spin_sleep(15);
 	sprintf(fnbuf, "%s/doom64monster.pal", fnpre);
 	fs_load(fnbuf, (void **)&pal1);
-
-	short *pal2;
+	W_DrawLoadScreen("Palettes", 50, 100);
+	timer_spin_sleep(15);
 	sprintf(fnbuf, "%s/doom64nonenemy.pal", fnpre);
 	fs_load(fnbuf, (void **)&pal2);
+	W_DrawLoadScreen("Palettes", 100, 100);
+	timer_spin_sleep(15);
 
 	pvr_set_pal_format(PVR_PAL_ARGB1555);
 	for(int i=1;i<256;i++) {
-#if 0
+#if 1
+		pvr_set_pal_entry(i, 0x8000 | pal1[i]);
+#else
+		// if you want to modify the enemy palette as it gets loaded
 		uint8_t r = (pal1[i] >> 10) & 0x1f;
 		uint8_t g = (pal1[i] >> 5) & 0x1f;
 		uint8_t b = pal1[i] & 0x1f;
-//		if (r && g && b) {
-			int hsv = LightGetHSV(r << 3,g << 3,b << 3);
-			int h = (hsv >> 16)&0xff;
-			int s = (hsv >> 8)&0xff;
-			int v = hsv &0xff;
+		int hsv = LightGetHSV(r << 3,g << 3,b << 3);
+		int h = (hsv >> 16)&0xff;
+		int s = (hsv >> 8)&0xff;
+		int v = hsv &0xff;
 
-			v = (v * 102) / 100;
-			if (v > 255)
-				v = 255;
-			int rgb = LightGetRGB(h,s,v);
-			r = (rgb>>16)&0xff;
-			g = (rgb>>8)&0xff;
-			b = rgb&0xff;
-//		}
-		pvr_set_pal_entry(i, get_color_argb1555(r,g,b,1));//pal1[i]);
+		// 2% intensity increase
+		v = (v * 102) / 100;
+		if (v > 255)
+			v = 255;
+		int rgb = LightGetRGB(h,s,v);
+		r = (rgb>>16)&0xff;
+		g = (rgb>>8)&0xff;
+		b = rgb&0xff;
+		pvr_set_pal_entry(i, get_color_argb1555(r,g,b,1));
 #endif
-		pvr_set_pal_entry(i, 0x8000 | pal1[i]);
 	}
+
 	for(int i=1;i<256;i++) {
-#if 0
+#if 1
+		pvr_set_pal_entry(256 + i, 0x8000 | pal2[i]);
+#else
+		// if you want to modify the non-enemy palette as it gets loaded
 		uint8_t r = (pal2[i] >> 10) & 0x1f;
 		uint8_t g = (pal2[i] >> 5) & 0x1f;
 		uint8_t b = pal2[i] & 0x1f;
-//		if (r && g && b) {
-			int hsv = LightGetHSV(r << 3,g << 3,b << 3);
-			int h = (hsv >> 16)&0xff;
-			int s = (hsv >> 8)&0xff;
-			int v = hsv &0xff;
+		int hsv = LightGetHSV(r << 3,g << 3,b << 3);
+		int h = (hsv >> 16)&0xff;
+		int s = (hsv >> 8)&0xff;
+		int v = hsv &0xff;
 
-			v = (v * 102) / 100;
-			if (v > 255)
-				v = 255;
-			int rgb = LightGetRGB(h,s,v);
-			r = (rgb>>16)&0xff;
-			g = (rgb>>8)&0xff;
-			b = rgb&0xff;
-//		}		
-		pvr_set_pal_entry(256 + i, get_color_argb1555(r,g,b,1));//pal1[i]);	
+		// 2% intensity increase
+		v = (v * 102) / 100;
+		if (v > 255)
+			v = 255;
+		int rgb = LightGetRGB(h,s,v);
+		r = (rgb>>16)&0xff;
+		g = (rgb>>8)&0xff;
+		b = rgb&0xff;
+		pvr_set_pal_entry(256 + i, get_color_argb1555(r,g,b,1));
 #endif
-		pvr_set_pal_entry(256+i, 0x8000 | pal2[i]);
 	}
 	
+	// color 0 is always transparent (replacing RGB ff 00 ff)
 	pvr_set_pal_entry(0,0);
 	pvr_set_pal_entry(256,0);
 
-	dbgio_printf("PVR mem free before sprites: %lu\n", pvr_mem_available());
-
+	// all non-enemy sprites are in an uncompressed, pretwiddled 8bpp 1024^2 sheet texture
+	W_DrawLoadScreen("Item Tex", 0, 100);
+	timer_spin_sleep(15);
 	sprintf(fnbuf, "%s/vq/non_enemy.tex", fnpre);
 	size_t vqsize = fs_load(fnbuf, &pnon_enemy);
+	W_DrawLoadScreen("Item Tex", 50, 100);
+	timer_spin_sleep(15);
 	dbgio_printf("non_enemy loaded size is %d\n", vqsize);
-	pvr_non_enemy = pvr_mem_malloc(vqsize);	
-	pvr_txr_load(16 + pnon_enemy, pvr_non_enemy, vqsize - 16);
+	pvr_non_enemy = pvr_mem_malloc(vqsize);
+	pvr_txr_load(pnon_enemy, pvr_non_enemy, vqsize);
 	free(pnon_enemy);
+	W_DrawLoadScreen("Item Tex", 100, 100);
+	timer_spin_sleep(15);
 	dbgio_printf("PVR mem free after non_enemy: %lu\n", pvr_mem_available());
+
+	// doom64 wad
+	dbgio_printf("W_Init: Loading IWAD into RAM...\n");
 
 	wadfileptr = (wadinfo_t *)Z_Alloc(sizeof(wadinfo_t), PU_STATIC, NULL);
 	sprintf(fnbuf, "%s/pow2.wad", fnpre); // doom64.wad
 	wad_file = fs_open(fnbuf, O_RDONLY);
+	if (-1 == wad_file) {
+		I_Error("Could not open %s for reading.\n", fnbuf);
+	}
 
-	s2_wadfileptr = (wadinfo_t *)Z_Alloc(sizeof(wadinfo_t), PU_STATIC, NULL);
-	sprintf(fnbuf, "%s/alt.wad", fnpre);
-	s2_file = fs_open(fnbuf, O_RDONLY);
-
-	dbgio_printf("W_Init: Loading IWAD into RAM...\n");
 	size_t full_wad_size = fs_seek(wad_file, 0, SEEK_END);
 	size_t wad_rem_size = full_wad_size;
 	fullwad = malloc(wad_rem_size);
@@ -343,11 +358,30 @@ void W_Init (void)
 	fs_read(wad_file, (void*)fullwad + wad_read, wad_rem_size);
 	wad_read += wad_rem_size;
 	W_DrawLoadScreen("Doom 64 IWAD", wad_read, full_wad_size);
-malloc_stats();
+	malloc_stats();
 	dbgio_printf("Done.\n");
 	fs_close(wad_file);
 
+	memcpy((void*)wadfileptr, fullwad + 0, sizeof(wadinfo_t));
+	if (D_strncasecmp(&wadfileptr->identification[1], "WAD", 3))
+		I_Error("W_Init: invalid main IWAD id");
+	numlumps = (wadfileptr->numlumps);
+	lumpinfo = (lumpinfo_t *) Z_Malloc(numlumps * sizeof(lumpinfo_t), PU_STATIC, 0);
+	infotableofs = (wadfileptr->infotableofs);
+	memcpy((void*)lumpinfo, fullwad + infotableofs, numlumps * sizeof(lumpinfo_t));
+	lumpcache = (lumpcache_t *) Z_Malloc(numlumps * sizeof(lumpcache_t), PU_STATIC, 0);
+	D_memset(lumpcache, 0, numlumps * sizeof(lumpcache_t));
+	Z_Free(wadfileptr);
+
+	// alternate palette sprite wad
 	dbgio_printf("W_Init: Loading alt sprite PWAD into RAM...\n");
+
+	s2_wadfileptr = (wadinfo_t *)Z_Alloc(sizeof(wadinfo_t), PU_STATIC, NULL);
+	sprintf(fnbuf, "%s/alt.wad", fnpre);
+	s2_file = fs_open(fnbuf, O_RDONLY);
+	if (-1 == s2_file) {
+		I_Error("Could not open %s for reading.\n", fnbuf);
+	}
 	size_t alt_wad_size = fs_seek(s2_file, 0, SEEK_END);
 	wad_rem_size = alt_wad_size;
 	s2wad = malloc(wad_rem_size);
@@ -364,57 +398,44 @@ malloc_stats();
 	W_DrawLoadScreen("Sprite WAD", wad_read, alt_wad_size);
 	dbgio_printf("Done.\n");
 	fs_close(s2_file);
-malloc_stats();
-
-	pvr_poly_cxt_txr(&pvr_sprite_cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_PAL8BPP | PVR_TXRFMT_8BPP_PAL(1) | PVR_TXRFMT_TWIDDLED, 1024, 1024, pvr_non_enemy, PVR_FILTER_BILINEAR);
-	pvr_sprite_cxt.gen.specular = PVR_SPECULAR_ENABLE;
-	pvr_sprite_cxt.gen.fog_type = PVR_FOG_TABLE;
-	pvr_sprite_cxt.gen.fog_type2 = PVR_FOG_TABLE;
-	pvr_poly_compile(&pvr_sprite_hdr, &pvr_sprite_cxt);	
-
-	memcpy((void*)wadfileptr, fullwad + 0, sizeof(wadinfo_t));
-
-	if (D_strncasecmp(wadfileptr->identification, "IWAD", 4))
-		I_Error("W_Init: invalid main IWAD id");
-
-	numlumps = (wadfileptr->numlumps);
-	lumpinfo = (lumpinfo_t *) Z_Malloc(numlumps * sizeof(lumpinfo_t), PU_STATIC, 0);
-	infotableofs = (wadfileptr->infotableofs);
-
-	memcpy((void*)lumpinfo, fullwad + infotableofs, numlumps * sizeof(lumpinfo_t));
-
-	lumpcache = (lumpcache_t *) Z_Malloc(numlumps * sizeof(lumpcache_t), PU_STATIC, 0);
-	D_memset(lumpcache, 0, numlumps * sizeof(lumpcache_t));
-	Z_Free(wadfileptr);
-
+	malloc_stats();
 
 	memcpy((void*)s2_wadfileptr, s2wad + 0, sizeof(wadinfo_t));
-
 	if (D_strncasecmp(s2_wadfileptr->identification, "PWAD", 4))
 		I_Error("W_Init: invalid alt sprite PWAD id");
-
 	s2_numlumps = (s2_wadfileptr->numlumps);
 	s2_lumpinfo = (lumpinfo_t *) Z_Malloc(s2_numlumps * sizeof(lumpinfo_t), PU_STATIC, 0);
 	s2_infotableofs = (s2_wadfileptr->infotableofs);
-
 	memcpy((void*)s2_lumpinfo, s2wad + s2_infotableofs, s2_numlumps * sizeof(lumpinfo_t));
-
 	s2_lumpcache = (lumpcache_t *) Z_Malloc(s2_numlumps * sizeof(lumpcache_t), PU_STATIC, 0);
 	D_memset(s2_lumpcache, 0, s2_numlumps * sizeof(lumpcache_t));
 	Z_Free(s2_wadfileptr);
 
+	// common shared poly context/header used for all non-enemy sprites
+	pvr_poly_cxt_txr(&pvr_sprite_cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_PAL8BPP | PVR_TXRFMT_8BPP_PAL(1) | PVR_TXRFMT_TWIDDLED, 1024, 1024, pvr_non_enemy, PVR_FILTER_BILINEAR);
+	pvr_sprite_cxt.gen.specular = PVR_SPECULAR_ENABLE;
+	pvr_sprite_cxt.gen.fog_type = PVR_FOG_TABLE;
+	pvr_sprite_cxt.gen.fog_type2 = PVR_FOG_TABLE;
+	pvr_poly_compile(&pvr_sprite_hdr, &pvr_sprite_cxt);
+	
+	pvr_poly_cxt_txr(&pvr_sprite_cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_PAL8BPP | PVR_TXRFMT_8BPP_PAL(1) | PVR_TXRFMT_TWIDDLED, 1024, 1024, pvr_non_enemy, PVR_FILTER_NONE);
+	pvr_sprite_cxt.gen.specular = PVR_SPECULAR_ENABLE;
+	pvr_sprite_cxt.gen.fog_type = PVR_FOG_TABLE;
+	pvr_sprite_cxt.gen.fog_type2 = PVR_FOG_TABLE;
+	pvr_poly_compile(&pvr_sprite_hdr_nofilter, &pvr_sprite_cxt);	
 }
 
-char retname[9];
-
-char *W_GetNameForNum(int num) {
+static char retname[9];
+// return human-readable "uncompressed" name for a lump number
+char *W_GetNameForNum(int num)
+{
 	memset(retname,0,9);
     int ln_len = strlen(lumpinfo[num].name);
     if(ln_len > 8) ln_len = 8;
     memcpy(retname, lumpinfo[num].name, ln_len);
 	retname[0] &= 0x7f;
 
-	return retname;//lumpinfo[num].name;
+	return retname;
 }
 
 /*
@@ -826,10 +847,9 @@ MAP LUMP BASED ROUTINES
 = Exclusive Psx Doom / Doom64
 ====================
 */
-
 void W_OpenMapWad(int mapnum) // 8002C5B0
 {
-	int lump, size, infotableofs;
+	int infotableofs;
 	char name [8];
 
     name[0] = 'M';
@@ -838,14 +858,27 @@ void W_OpenMapWad(int mapnum) // 8002C5B0
     name[3] = '0' + (char)(mapnum / 10);
     name[4] = '0' + (char)(mapnum % 10);
     name[5] = 0;
-
-    lump = W_GetNumForName(name);
-    size = W_LumpLength(lump);
-
-    mapfileptr = Z_Alloc(size, PU_STATIC, NULL);
-
-    W_ReadLump(lump, mapfileptr, dec_d64);
-
+#if 0
+	if ((name[3] == '0') && ((name[4] == '1') || (name[4] == '2') || (name[4] == '3'))) {
+		sprintf(fnbuf, "%s/map%c%c.wad", fnpre, name[3], name[4]);
+		file_t mapfd = fs_open(fnbuf, O_RDONLY);
+		if(-1 == mapfd) {
+			I_Error("Could not open %s for reading.\n", fnbuf);
+		}
+		size_t mapsize = fs_seek(mapfd, 0, SEEK_END);
+		fs_seek(mapfd, 0, SEEK_SET);
+		mapfileptr = Z_Alloc(mapsize, PU_STATIC, NULL);
+		fs_read(mapfd, mapfileptr, mapsize);
+		fs_close(mapfd);
+	} else 
+#endif	
+	{
+		int lump, size;
+		lump = W_GetNumForName(name);
+		size = W_LumpLength(lump);
+		mapfileptr = Z_Alloc(size, PU_STATIC, NULL);
+		W_ReadLump(lump, mapfileptr, dec_d64);
+	}
     mapnumlumps = (((wadinfo_t*)mapfileptr)->numlumps);
     infotableofs = (((wadinfo_t*)mapfileptr)->infotableofs);
 

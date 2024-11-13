@@ -360,7 +360,8 @@ boolean enable_messages = true; // 8005A7B8
 int HUDopacity = 255;			// [Immorpher] HUD opacity
 int SfxVolume = 75;             // 8005A7C0
 int MusVolume = 85;             // 8005A7C4
-int brightness = 100;             // 8005A7C8
+#define MAX_BRIGHTNESS 127
+int brightness = 60; // 8005A7C8
 int M_SENSITIVITY = 0;          // 8005A7CC
 boolean FeaturesUnlocked = true; // 8005A7D0
 int MotionBob = 0x100000; // [Immorpher] Motion Bob works in hexadecimal
@@ -1053,11 +1054,11 @@ int M_MenuTicker(void) // 80007E0C
                 case 9: // Brightness
                     if (buttons & PAD_RIGHT)
                     {
-                        brightness += 2; // [Immorpher] increments doubled for scroll speed
-                        if (brightness <= 200)
+                        brightness += 1;
+                        if (brightness <= MAX_BRIGHTNESS)
                         {
                             P_RefreshBrightness();
-                            if (brightness & 2)
+                            if (brightness & 1)
                             {
                                 S_StartSound(NULL, sfx_secmove);
                                 return ga_nothing;
@@ -1065,12 +1066,12 @@ int M_MenuTicker(void) // 80007E0C
                         }
                         else
                         {
-                            brightness = 200;
+                            brightness = MAX_BRIGHTNESS;
                         }
                     }
                     else if (buttons & PAD_LEFT)
                     {
-                        brightness -= 2; // [Immorpher] decrement speed doubled
+                        brightness -= 1;
                         if (brightness < 0)
                         {
                             brightness = 0;
@@ -1078,7 +1079,7 @@ int M_MenuTicker(void) // 80007E0C
                         else
                         {
                             P_RefreshBrightness();
-                            if (brightness & 2)
+                            if (brightness & 1)
                             {
                                 S_StartSound(NULL, sfx_secmove);
                                 return ga_nothing;
@@ -1693,12 +1694,6 @@ int M_MenuTicker(void) // 80007E0C
 							VideoFilter = 0;
 						}
 						force_filter_flush = 1;
-						if (!VideoFilter) {
-							pvr_sprite_cxt.txr.filter = PVR_FILTER_BILINEAR;
-						} else {
-							pvr_sprite_cxt.txr.filter = PVR_FILTER_NONE;
-						}	
-						pvr_poly_compile(&pvr_sprite_hdr, &pvr_sprite_cxt);
                         return ga_nothing;
                     }
                     break;
@@ -1845,7 +1840,7 @@ int M_MenuTicker(void) // 80007E0C
 						Autorun = false;
 
 						// Set video options
-                        brightness = 100;
+                        brightness = 60;
 						VideoFilter = 0; // [Immorpher] new video option
 						antialiasing = false; // [Immorpher] new video option
 						interlacing = false;  // [Immorpher] new video option
@@ -1891,7 +1886,7 @@ int M_MenuTicker(void) // 80007E0C
 						Autorun = true;
 
 						// Set video options
-                        brightness = 200;
+                        brightness = 127;
 						VideoFilter = 1; // [Immorpher] new video option
 						antialiasing = false; // [Immorpher] new video option
 						interlacing = false;  // [Immorpher] new video option
@@ -1937,7 +1932,7 @@ int M_MenuTicker(void) // 80007E0C
 						Autorun = true;
 
 						// Set video options
-                        brightness = 200;
+                        brightness = 127;
 						VideoFilter = 0; // [Immorpher] new video option
 						antialiasing = false; // [Immorpher] new video option
 						interlacing = false;  // [Immorpher] new video option
@@ -2404,7 +2399,7 @@ void M_VideoDrawer(void) // 80009884
     }
 
     ST_DrawSymbol(82, 80, 68, text_alpha | 0xffffff00);
-    ST_DrawSymbol(brightness  / 2  + 83, 80, 69, text_alpha | 0xffffff00);
+    ST_DrawSymbol(((101*brightness)>>7) + 83, 80, 69, text_alpha | 0xffffff00);
 
     ST_DrawSymbol(Menu_Video[0].x - 37, Menu_Video[cursorpos].y - 9, MenuAnimationTic + 70, text_alpha | 0xffffff00);
 }
@@ -3123,6 +3118,9 @@ void M_SavePakDrawer(void) // 8000AB44
     //gDPSetFillColor(GFX1++, GPACK_RGBA5551(0,0,0,0) << 16 | GPACK_RGBA5551(0,0,0,0)) ;
     //gDPFillRectangle(GFX1++, 0, 0, SCREEN_WD-1, SCREEN_HT-1);
 
+	// Fill borders with black
+	pvr_set_bg_color(0,0,0);
+	pvr_fog_table_color(0.0f,0.0f,0.0f,0.0f);
     M_DrawBackground(63, 25, 128, "EVIL", 0.00015f, 0);
 
     ST_DrawString(-1, 20, "Controller Pak", text_alpha | 0xc0000000);

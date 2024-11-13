@@ -19,6 +19,48 @@ buttons_t   *BT_DATA[MAXPLAYERS];
 
 extern boolean run_hectic_demo;
 
+unsigned char lightcurve[256] = { // [Immorpher] - table to optionally boost brightness
+	0, 1, 3, 4, 6, 7, 9, 11, 13, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32,
+	34, 36, 38, 40, 42, 45, 47, 49, 51, 53, 55, 58, 60, 62, 64, 66, 69,
+	71, 73, 75, 77, 80, 82, 84, 86, 89, 91, 93, 95, 97, 100, 102, 104,
+	106, 109, 111, 113, 115, 117, 120, 122, 124, 126, 128, 130, 133, 135,
+	137, 139, 141, 143, 145, 148, 150, 152, 154, 156, 158, 160, 162, 164,
+	166, 168, 170, 172, 174, 176, 178, 180, 182, 184, 186, 188, 190, 192,
+	194, 195, 197, 199, 201, 202, 202, 203, 204, 205, 205, 206, 207, 208,
+	208, 209, 210, 210, 211, 212, 212, 213, 214, 214, 215, 216, 216, 217,
+	218, 218, 219, 219, 220, 221, 221, 222, 222, 223, 223, 224, 224, 225,
+	226, 226, 227, 227, 228, 228, 229, 229, 230, 230, 231, 231, 231, 232,
+	232, 233, 233, 234, 234, 235, 235, 235, 236, 236, 237, 237, 237, 238,
+	238, 239, 239, 239, 240, 240, 240, 241, 241, 241, 242, 242, 242, 243,
+	243, 243, 244, 244, 244, 245, 245, 245, 245, 246, 246, 246, 247, 247,
+	247, 247, 248, 248, 248, 248, 249, 249, 249, 249, 249, 250, 250, 250,
+	250, 250, 251, 251, 251, 251, 251, 252, 252, 252, 252, 252, 252, 252,
+	253, 253, 253, 253, 253, 253, 253, 253, 254, 254, 254, 254, 254, 254,
+	254, 254, 254, 254, 254, 254, 255, 255, 255, 255, 255, 255, 255, 255,
+	255, 255, 255, 255, 255, 255, 255, 255
+};
+
+unsigned char lightmax[256] = { // [Immorpher] - table for maximum light curve that is a quarter of a circle
+	0, 23, 32, 39, 45, 50, 55, 59, 63, 67, 71, 74, 77, 80, 83, 86, 89, 92,
+	94, 97, 99, 101, 104, 106, 108, 110, 112, 114, 116, 118, 120, 122, 124,
+	125, 127, 129, 131, 132, 134, 136, 137, 139, 140, 142, 143, 145, 146,
+	148, 149, 150, 152, 153, 154, 156, 157, 158, 159, 161, 162, 163, 164,
+	165, 167, 168, 169, 170, 171, 172, 173, 174, 175, 177, 178, 179, 180,
+	181, 182, 183, 184, 185, 185, 186, 187, 188, 189, 190, 191, 192, 193,
+	194, 194, 195, 196, 197, 198, 199, 199, 200, 201, 202, 202, 203, 204,
+	205, 205, 206, 207, 208, 208, 209, 210, 210, 211, 212, 212, 213, 214,
+	214, 215, 216, 216, 217, 218, 218, 219, 219, 220, 221, 221, 222, 222,
+	223, 223, 224, 224, 225, 226, 226, 227, 227, 228, 228, 229, 229, 230,
+	230, 231, 231, 231, 232, 232, 233, 233, 234, 234, 235, 235, 235, 236,
+	236, 237, 237, 237, 238, 238, 239, 239, 239, 240, 240, 240, 241, 241,
+	241, 242, 242, 242, 243, 243, 243, 244, 244, 244, 245, 245, 245, 245,
+	246, 246, 246, 247, 247, 247, 247, 248, 248, 248, 248, 249, 249, 249,
+	249, 249, 250, 250, 250, 250, 250, 251, 251, 251, 251, 251, 252, 252,
+	252, 252, 252, 252, 252, 253, 253, 253, 253, 253, 253, 253, 253, 254,
+	254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 255, 255, 255,
+	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
+};
+
 void D_DoomMain(void)
 {
     int exit;
@@ -35,6 +77,11 @@ void D_DoomMain(void)
     ticon = 0;
     ticbuttons[0] = 0;
     oldticbuttons[0] = 0;
+
+#if 0
+	// when I need to test changes to the finale / cast drawer
+	MiniLoop(F_Start, F_Stop, F_Ticker, F_Drawer);
+#endif
 
     D_SplashScreen();
 
@@ -73,7 +120,7 @@ void D_DoomMain(void)
 
 // M_Random
 // Returns a 0-255 number
-const unsigned char rndtable[256] = 
+const unsigned char rndtable[256] =
 {
 	0, 8, 109, 220, 222, 241, 149, 107, 75, 248, 254, 140, 16, 66,
 	74, 21, 211, 47, 80, 242, 154, 27, 205, 128, 161, 89, 77, 36,
@@ -124,13 +171,15 @@ void M_ClearRandom(void)
 }
 
 uint64_t framecount = 0;
-extern uint8_t __attribute__((aligned(32))) op_buf[VERTBUF_SIZE];
-extern uint8_t __attribute__((aligned(32))) tr_buf[VERTBUF_SIZE];
+extern uint8_t __attribute__((aligned(32))) op_buf[OP_VERTBUF_SIZE];
+extern uint8_t __attribute__((aligned(32))) tr_buf[TR_VERTBUF_SIZE];
 
 extern int last_Ltrig;
 extern int last_Rtrig;
 
-static uint64_t start_time, end_time;
+extern volatile int rdpmsg;
+
+extern mutex_t rdpmtx;
 
 int MiniLoop(void(*start)(void), void(*stop)(),
              int(*ticker)(void), void(*drawer)(void))
@@ -152,7 +201,6 @@ int MiniLoop(void(*start)(void), void(*stop)(),
 	drawsync2 = vsync;
 
 	while (true) {
-		start_time = timer_us_gettime64();
 		vblsinframe[0] = drawsync1;
 
 		// get buttons for next tic
@@ -163,22 +211,18 @@ int MiniLoop(void(*start)(void), void(*stop)(),
 
 		// Read|Write demos
 		if (demoplayback) {
-			//last_Ltrig = 255;
-			//last_Rtrig = 255;
-
 			if (buttons & (ALL_JPAD|ALL_BUTTONS)) {
 				exit = ga_exit;
 				break;
 			}
 
 			buttons = *demobuffer++;
+			ticbuttons[0] = buttons;
 
 			if ((buttons & PAD_START) || (((uintptr_t)demobuffer - (uintptr_t)demo_p) >= 16000)) {
 				exit = ga_exitdemo;
 				break;
 			}
-
-			ticbuttons[0] = buttons;
 		}
 
 		ticon += vblsinframe[0];
@@ -194,23 +238,21 @@ int MiniLoop(void(*start)(void), void(*stop)(),
 			if (exit != ga_nothing)
 				break;
 
-			vid_waitvbl();
 			pvr_scene_begin();
-			pvr_set_vertbuf(PVR_LIST_OP_POLY, op_buf, VERTBUF_SIZE);
-			pvr_set_vertbuf(PVR_LIST_TR_POLY, tr_buf, VERTBUF_SIZE);
+			pvr_set_vertbuf(PVR_LIST_OP_POLY, op_buf, OP_VERTBUF_SIZE);
+			pvr_set_vertbuf(PVR_LIST_TR_POLY, tr_buf, TR_VERTBUF_SIZE);
 
 			drawer();
 
 			pvr_scene_finish();
 			pvr_wait_ready();
+
+			mutex_lock(&rdpmtx);
+			rdpmsg = 1;
+			mutex_unlock(&rdpmtx);
 		}
 
 		gamevbls = gametic;
-
-		// best effort 30fps cap when frame time is less than 1/30th of a second
-		end_time = timer_us_gettime64();
-		if((end_time - start_time) < 33333)
-			usleep(33333 - (end_time - start_time));
 
 		framecount += 1;
 	}

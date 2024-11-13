@@ -13,7 +13,8 @@ extern int VideoFilter;
 extern pvr_poly_cxt_t **tcxt;
 extern void **tsptrs;
 
-extern pvr_poly_hdr_t **headers_for_sprites;
+extern pvr_poly_hdr_t pvr_sprite_hdr;
+extern pvr_poly_hdr_t pvr_sprite_hdr_nofilter;
 
 extern float *all_u;
 extern float *all_v;
@@ -102,6 +103,7 @@ void clip_edge(d64Vertex_t *v1, d64Vertex_t *v2, d64Vertex_t *out)
 	out->v.x = invt * v1->v.x + t * v2->v.x;
 	out->v.y = invt * v1->v.y + t * v2->v.y;
 	out->v.z = invt * v1->v.z + t * v2->v.z;
+
 	out->v.u = invt * v1->v.u + t * v2->v.u;
 	out->v.v = invt * v1->v.v + t * v2->v.v;
 
@@ -111,9 +113,9 @@ void clip_edge(d64Vertex_t *v1, d64Vertex_t *v2, d64Vertex_t *out)
 
 uint32_t lighted_color(uint32_t c, int ll)
 {
-	uint8_t r = (uint8_t)(((int)(256 + ((int)UNPACK_R(c)))*(int)ll) >> 9);
-	uint8_t g = (uint8_t)(((int)(256 + ((int)UNPACK_G(c)))*(int)ll) >> 9);
-	uint8_t b = (uint8_t)(((int)(256 + ((int)UNPACK_B(c)))*(int)ll) >> 9);
+	uint8_t r = (uint8_t)((UNPACK_R(c)*ll)>>8);//(((int)(256 + ((int)UNPACK_R(c)))*(int)ll) >> 9);
+	uint8_t g = (uint8_t)((UNPACK_G(c)*ll)>>8);//(((int)(256 + ((int)UNPACK_G(c)))*(int)ll) >> 9);
+	uint8_t b = (uint8_t)((UNPACK_B(c)*ll)>>8);//(((int)(256 + ((int)UNPACK_B(c)))*(int)ll) >> 9);
 	uint8_t a = UNPACK_A(c);
 	return D64_PVR_PACK_COLOR(a,r,g,b);
 }
@@ -244,10 +246,10 @@ void clip_triangle(d64Triangle_t *triangle, pvr_poly_hdr_t *hdr, int lightlevel,
 	/* dVerts[0] and dVerts[1] visible */
 	case 3: {
 		/* out 1 */
-		clip_edge(&triangle->dVerts[2], &triangle->dVerts[0], &triangle->spare[0]);
+		clip_edge(&triangle->dVerts[1], &triangle->dVerts[2], &triangle->spare[0]);
 
 		/* out 2 */
-		clip_edge(&triangle->dVerts[1], &triangle->dVerts[2], &triangle->spare[1]);
+		clip_edge(&triangle->dVerts[2], &triangle->dVerts[0], &triangle->spare[1]);
 
 		perspdiv(&triangle->dVerts[0]);
 		perspdiv(&triangle->dVerts[1]);
@@ -259,8 +261,6 @@ void clip_triangle(d64Triangle_t *triangle, pvr_poly_hdr_t *hdr, int lightlevel,
 
 		pvr_list_prim(list, hdr, sizeof(pvr_poly_hdr_t));
 		pvr_list_prim(list, &triangle->dVerts[0].v, sizeof(pvr_vertex_t));
-		pvr_list_prim(list, &triangle->dVerts[1].v, sizeof(pvr_vertex_t));
-		pvr_list_prim(list, &triangle->spare[0].v, sizeof(pvr_vertex_t));
 		pvr_list_prim(list, &triangle->dVerts[1].v, sizeof(pvr_vertex_t));
 		pvr_list_prim(list, &triangle->spare[1].v, sizeof(pvr_vertex_t));
 		pvr_list_prim(list, &triangle->spare[0].v, sizeof(pvr_vertex_t));
@@ -279,20 +279,15 @@ void clip_triangle(d64Triangle_t *triangle, pvr_poly_hdr_t *hdr, int lightlevel,
 		perspdiv(&triangle->spare[0]);
 		perspdiv(&triangle->spare[1]);
 
+		triangle->dVerts[2].v.flags = PVR_CMD_VERTEX;
 		triangle->spare[0].v.flags = PVR_CMD_VERTEX;
-		triangle->spare[1].v.flags = PVR_CMD_VERTEX;
+		triangle->spare[1].v.flags = PVR_CMD_VERTEX_EOL;
 
 		pvr_list_prim(list, hdr, sizeof(pvr_poly_hdr_t));
 		pvr_list_prim(list, &triangle->dVerts[0].v, sizeof(pvr_vertex_t));
 		pvr_list_prim(list, &triangle->spare[0].v, sizeof(pvr_vertex_t));
 		pvr_list_prim(list, &triangle->dVerts[2].v, sizeof(pvr_vertex_t));
-
-		triangle->dVerts[2].v.flags = PVR_CMD_VERTEX;
-		triangle->spare[0].v.flags = PVR_CMD_VERTEX_EOL;
-
 		pvr_list_prim(list, &triangle->spare[1].v, sizeof(pvr_vertex_t));
-		pvr_list_prim(list, &triangle->dVerts[2].v, sizeof(pvr_vertex_t));
-		pvr_list_prim(list, &triangle->spare[0].v, sizeof(pvr_vertex_t));
 	}
 	break;
 	/* dVerts[1] and dVerts[2] visible */
@@ -306,17 +301,15 @@ void clip_triangle(d64Triangle_t *triangle, pvr_poly_hdr_t *hdr, int lightlevel,
 		perspdiv(&triangle->spare[0]);
 		perspdiv(&triangle->spare[1]);
 
-		triangle->dVerts[2].v.flags = PVR_CMD_VERTEX;
+		triangle->dVerts[2].v.flags = PVR_CMD_VERTEX_EOL;
 		triangle->spare[0].v.flags = PVR_CMD_VERTEX;
-		triangle->spare[1].v.flags = PVR_CMD_VERTEX_EOL;
+		triangle->spare[1].v.flags = PVR_CMD_VERTEX;
 
 		pvr_list_prim(list, hdr, sizeof(pvr_poly_hdr_t));
 		pvr_list_prim(list, &triangle->spare[0].v, sizeof(pvr_vertex_t));
 		pvr_list_prim(list, &triangle->dVerts[1].v, sizeof(pvr_vertex_t));
 		pvr_list_prim(list, &triangle->spare[1].v, sizeof(pvr_vertex_t));
-		pvr_list_prim(list, &triangle->dVerts[1].v, sizeof(pvr_vertex_t));
 		pvr_list_prim(list, &triangle->dVerts[2].v, sizeof(pvr_vertex_t));
-		pvr_list_prim(list, &triangle->spare[1].v, sizeof(pvr_vertex_t));
 	}
 	break;
 	}
@@ -443,16 +436,15 @@ void R_WallPrep(seg_t *seg)
 	fixed_t m_top;
 	fixed_t m_bottom;
 	fixed_t rowoffs;
-#if 0
-	unsigned int height2;
-#endif
-	int height;
+	fixed_t height;
 	int frontheight;
-	int sideheight1;
+	int sideheight;
 	short pic;
 
-	float r1, g1, b1;
-	float r2, g2, b2;
+	unsigned int r1, g1, b1;
+	unsigned int r2, g2, b2;
+	float rn, gn, bn;
+	float scale;
 	unsigned int thingcolor;
 	unsigned int upcolor;
 	unsigned int lowcolor;
@@ -483,12 +475,12 @@ void R_WallPrep(seg_t *seg)
 	frontheight = f_ceilingheight - f_floorheight;
 
 	if (li->flags & ML_BLENDING) {
-		r1 = (float)((upcolor  >> 24) & 0xff);
-		g1 = (float)((upcolor  >> 16) & 0xff);
-		b1 = (float)((upcolor  >> 8) & 0xff);
-		r2 = (float)((lowcolor >> 24) & 0xff);
-		g2 = (float)((lowcolor >> 16) & 0xff);
-		b2 = (float)((lowcolor >> 8) & 0xff);
+		r1 = ((upcolor  >> 24) & 0xff);
+		g1 = ((upcolor  >> 16) & 0xff);
+		b1 = ((upcolor  >> 8) & 0xff);
+		r2 = ((lowcolor >> 24) & 0xff);
+		g2 = ((lowcolor >> 16) & 0xff);
+		b2 = ((lowcolor >> 8) & 0xff);
 		tmp_upcolor = upcolor;
 		tmp_lowcolor = lowcolor;
 	} else {
@@ -515,43 +507,33 @@ void R_WallPrep(seg_t *seg)
 
 			if (li->flags & ML_BLENDING) {
 				if (frontheight && !(li->flags & ML_BLENDFULLTOP)) {
-#if 1
-					sideheight1 = b_ceilingheight - f_floorheight;
+					sideheight = b_ceilingheight - f_ceilingheight;
 
-					float scale1 = (float)sideheight1 / (float)frontheight;
-					float scale2 = (float)height / (float)frontheight;
-			
-					float nr1 = r1*scale1;
-					float ng1 = g1*scale1;
-					float nb1 = b1*scale1;
+					scale = (float)sideheight / (float)frontheight;
 
-					float nr2 = r2*scale2;
-					float ng2 = g2*scale2;
-					float nb2 = b2*scale2;
+					rn = ((float)r1-(float)r2)*scale + (float)r1;
+					gn = ((float)g1-(float)g2)*scale + (float)g1;
+					bn = ((float)b1-(float)b2)*scale + (float)b1;
 
-					float rf = nr1 + nr2;
-					float gf = ng1 + ng2;
-					float bf = nb1 + nb2;
+					if (!((rn < 256) && (gn < 256) && (bn < 256))) { // Rescale if out of color bounds
+						scale = 255.0f;
 
-					if (!((rf < 256) && (gf < 256) && (bf < 256))) {
-						float scale = 255.0f;
-
-						if (rf >= gf && rf >= bf) {
-							scale /= rf;
-						} else if (gf >= rf && gf >= bf) {
-							scale /= gf;
+						if (rn >= gn && rn >= bn) {
+							scale /= rn;
+						} else if (gn >= rn && gn >= bn) {
+							scale /= gn;
 						} else {
-							scale /= bf;
+							scale /= bn;
 						}
 
-						rf *= scale;
-						gf *= scale;
-						bf *= scale;
+						rn *= scale;
+						gn *= scale;
+						bn *= scale;
 					}
 
-					tmp_lowcolor = ((int)rf << 24) | ((int)gf << 16) | ((int)bf << 8) | 0xff;
+					tmp_lowcolor = ((int)rn << 24) | ((int)gn << 16) | ((int)bn << 8) | 0xff;
 
-					if (gamemap == 3 && brightness > 100) {
+					if (gamemap == 3 && (brightness > 57) && (brightness < 90)) {
 						int x1 = li->v1->x >> 16;
 						int y1 = li->v1->y >> 16;
 						int x2 = li->v2->x >> 16;
@@ -559,47 +541,19 @@ void R_WallPrep(seg_t *seg)
 
 						if ( ( (x1 == 1040 && y1 == -176) && (x2 == 1008 && y2 == -176) ) ||
 							( (x1 == 1008 && y1 == -464) && (x2 == 1040 && y2 == -464) ) ) {
-							float scale = 1.0f - ((float)(brightness-100)*0.0025f);
+							float scale = 1.0f - ((float)((/*brightness*/75-60)*3.0f)*0.0025f);
 
 							tmp_upcolor = ((int)(r1*scale)<<24) |
 											((int)(g1*scale)<<16) |
 											((int)(b1*scale)<<8) |
 											0xff;
 
-							tmp_lowcolor = ((int)(rf*scale) << 24) |
-											((int)(gf*scale) << 16) |
-											((int)(bf*scale) << 8) |
+							tmp_lowcolor = ((int)(rn*scale) << 24) |
+											((int)(gn*scale) << 16) |
+											((int)(bn*scale) << 8) |
 											0xff;
 						}
 					}
-#else
-					if (f_floorheight < f_ceilingheight) {
-						height2 = ((height << 16) / (f_ceilingheight - f_floorheight));
-					} else {
-						height2 = 0;
-					}
-
-					unsigned int rf = (((unsigned int)r2 * height2) >> 16) + (((unsigned int)r1*(65536 - height2)) >> 16);
-					unsigned int gf = (((unsigned int)g2 * height2) >> 16) + (((unsigned int)g1*(65536 - height2)) >> 16);
-					unsigned int bf = (((unsigned int)b2 * height2) >> 16) + (((unsigned int)b1*(65536 - height2)) >> 16);
-
-					if (!((rf < 256) && (gf < 256) && (bf < 256))) {
-						unsigned int max;
-						if (rf >= gf && rf >= bf) {
-							max = rf;
-						} else if (gf >= rf && gf >= bf) {
-							max = gf;
-						} else {
-							max = bf;
-						}
-
-						rf = (((rf<<16) / max) * 255) >> 16;
-						gf = (((gf<<16) / max) * 255) >> 16;
-						bf = (((bf<<16) / max) * 255) >> 16;
-					}
-
-					tmp_lowcolor = (rf << 24) | (gf << 16) | (bf << 8) | 0xff;
-#endif
 				} 
 
 				if (li->flags & ML_INVERSEBLEND) {
@@ -644,43 +598,32 @@ void R_WallPrep(seg_t *seg)
 
 			if (li->flags & ML_BLENDING) {
 				if (frontheight && !(li->flags & ML_BLENDFULLBOTTOM)) {
-#if 1
-					int sideheight1 = b_floorheight - f_floorheight;
+					sideheight = b_floorheight - f_ceilingheight;
 
-					float scale1 = (float)sideheight1 / (float)frontheight;
-					float scale2 = (float)height / (float)frontheight;
-			
-					float nr1 = r1*scale1;
-					float ng1 = g1*scale1;
-					float nb1 = b1*scale1;
+					scale = (float)sideheight / (float)frontheight;
 
-					float nr2 = r2*scale2;
-					float ng2 = g2*scale2;
-					float nb2 = b2*scale2;
+					rn = ((float)r1-(float)r2)*scale + (float)r1;
+					gn = ((float)g1-(float)g2)*scale + (float)g1;
+					bn = ((float)b1-(float)b2)*scale + (float)b1;
 
-					float rf = nr1 + nr2;
-					float gf = ng1 + ng2;
-					float bf = nb1 + nb2;
+					if (!((rn < 256) && (gn < 256) && (bn < 256))) { // Rescale if out of color bounds
+						scale = 255.0f;
 
-					if (!((rf < 256) && (gf < 256) && (bf < 256))) {
-						float scale = 255.0f;
-
-						if (rf >= gf && rf >= bf) {
-							scale /= rf;
-						} else if (gf >= rf && gf >= bf) {
-							scale /= gf;
+						if (rn >= gn && rn >= bn) {
+							scale /= rn;
+						} else if (gn >= rn && gn >= bn) {
+							scale /= gn;
 						} else {
-							scale /= bf;
+							scale /= bn;
 						}
 
-						rf *= scale;
-						gf *= scale;
-						bf *= scale;
+						rn *= scale;
+						gn *= scale;
+						bn *= scale;
 					}
 
-					tmp_upcolor = ((int)rf << 24) | ((int)gf << 16) | ((int)bf << 8) | 0xff;
-
-					if (gamemap == 3 && brightness > 100) {
+					tmp_upcolor = ((int)rn << 24) | ((int)gn << 16) | ((int)bn << 8) | 0xff;
+					if (gamemap == 3 && (brightness > 57) && (brightness < 90)) {
 						int x1 = li->v1->x >> 16;
 						int y1 = li->v1->y >> 16;
 						int x2 = li->v2->x >> 16;
@@ -688,47 +631,19 @@ void R_WallPrep(seg_t *seg)
 
 						if ( ( (x1 == 1040 && y1 == -176) && (x2 == 1008 && y2 == -176) ) ||
 							( (x1 == 1008 && y1 == -464) && (x2 == 1040 && y2 == -464) ) ) {
-							float scale = 1.0f - ((float)(brightness-100)*0.0025f);
+							float scale = 1.0f - ((float)((/*brightness*/75-60)*3.0f)*0.0025f);
 
 							tmp_lowcolor = ((int)(r2*scale)<<24) |
 											((int)(g2*scale)<<16) |
 											((int)(b2*scale)<<8) |
 											0xff;
 
-							tmp_upcolor = ((int)(rf*scale) << 24) |
-											((int)(gf*scale) << 16) |
-											((int)(bf*scale) << 8) |
+							tmp_upcolor = ((int)(rn*scale) << 24) |
+											((int)(gn*scale) << 16) |
+											((int)(bn*scale) << 8) |
 											0xff;
 						}
 					}
-#else
-					if (f_floorheight < f_ceilingheight) {
-						height2 = ((height << 16) / (f_ceilingheight - f_floorheight));
-					} else {
-						height2 = 0;
-					}
-
-					unsigned int rf = (((unsigned int)r2 * height2) >> 16) + (((unsigned int)r1*(65536 - height2)) >> 16);
-					unsigned int gf = (((unsigned int)g2 * height2) >> 16) + (((unsigned int)g1*(65536 - height2)) >> 16);
-					unsigned int bf = (((unsigned int)b2 * height2) >> 16) + (((unsigned int)b1*(65536 - height2)) >> 16);
-
-					if (!((rf < 256) && (gf < 256) && (bf < 256))) {
-						unsigned int max;
-						if (rf >= gf && rf >= bf) {
-							max = rf;
-						} else if (gf >= rf && gf >= bf) {
-							max = gf;
-						} else {
-							max = bf;
-						}
-
-						rf = (((rf<<16) / max) * 255) >> 16;
-						gf = (((gf<<16) / max) * 255) >> 16;
-						bf = (((bf<<16) / max) * 255) >> 16;
-					}
-
-					tmp_upcolor = (rf << 24) | (gf << 16) | (bf << 8) | 0xff;
-#endif
 				}
 
 				topcolor = tmp_upcolor;
@@ -795,8 +710,8 @@ void R_WallPrep(seg_t *seg)
 
 #define INTEGER_VERT 0
 
-int last_width = 64;
-int last_height = 64;
+float last_width_inv = 1.0f / 64.0f;
+float last_height_inv = 1.0f / 64.0f;
 
 void P_CachePvrTexture(int i, int tag);
 
@@ -815,7 +730,7 @@ void R_RenderWall(seg_t *seg, int flags, int texture, int topHeight, int bottomH
 	
 	if (texture != 16) {
 		if (flags & ML_HMIRROR) {
-			cms = 1;
+			cms = 2;
 		} else {
 			cms = 0;
 		}
@@ -828,14 +743,12 @@ void R_RenderWall(seg_t *seg, int flags, int texture, int topHeight, int bottomH
 
 		if ((texture != globallump) || (globalcm != (cms | cmt))) {
 			data = W_CacheLumpNum(texture >> 4, PU_CACHE, dec_d64);
-			
-			P_CachePvrTexture(texnum, PU_CACHE);
-
 			wshift = SwapShort(((textureN64_t*)data)->wshift);
 			hshift = SwapShort(((textureN64_t*)data)->hshift);
+			last_width_inv = 1.0f / (float)(1 << wshift);
+			last_height_inv = 1.0f / (float)(1 << hshift);
 
-			last_width = 1 << wshift;
-			last_height = 1 << hshift;
+			P_CachePvrTexture(texnum, PU_CACHE);
 
 			// cms is S/H mirror
 			// cmt is T/V mirror
@@ -885,10 +798,10 @@ void R_RenderWall(seg_t *seg, int flags, int texture, int topHeight, int bottomH
 		short stu2 = stu1 + (seg->length >> 4);
 		short stv1 = topOffset;
 		short stv2 = bottomOffset;
-		float tu1 = (float)stu1 / (float)last_width;
-		float tu2 = (float)stu2 / (float)last_width;
-		float tv1 = (float)stv1 / (float)last_height;
-		float tv2 = (float)stv2 / (float)last_height;
+		float tu1 = (float)stu1 * last_width_inv;
+		float tu2 = (float)stu2 * last_width_inv;
+		float tv1 = (float)stv1 * last_height_inv;
+		float tv2 = (float)stv2 * last_height_inv;
 
 		dVTX[0] = &(dT1.dVerts[0]);
 		dVTX[1] = &(dT1.dVerts[1]);
@@ -922,8 +835,8 @@ void R_RenderWall(seg_t *seg, int flags, int texture, int topHeight, int bottomH
 	}
 }
 
-int last_sw;
-int last_sh;
+float last_sw_inv_x32;
+float last_sh_inv_x32;
 
 void R_RenderSwitch(seg_t *seg, int texture, int topOffset, int color)
 {
@@ -942,8 +855,8 @@ void R_RenderSwitch(seg_t *seg, int texture, int topOffset, int color)
 		wshift = SwapShort(((textureN64_t*)data)->wshift);
 		hshift = SwapShort(((textureN64_t*)data)->hshift);
 
-		last_sw = 1 << wshift;
-		last_sh = 1 << hshift;
+		last_sw_inv_x32 = 32.0f / (float)(1 << wshift);
+		last_sh_inv_x32 = 32.0f / (float)(1 << hshift);
 
 		if (!VideoFilter) {
 			tcxt[texture][0].txr.filter = PVR_FILTER_BILINEAR;
@@ -988,9 +901,9 @@ void R_RenderSwitch(seg_t *seg, int texture, int topOffset, int color)
 	float z2 = (float)((-y) - (sin << 3) + cos) * inv65536;
 #endif
 	float tu1 = 0.0f;
-	float tu2 = 32.0f / (float)last_sw;
+	float tu2 = last_sw_inv_x32;
 	float tv1 = 0.0f;
-	float tv2 = 32.0f / (float)last_sh;
+	float tv2 = last_sh_inv_x32;
 
 	dVTX[0] = &(dT1.dVerts[0]);
 	dVTX[1] = &(dT1.dVerts[1]);
@@ -1407,7 +1320,12 @@ void R_RenderThings(subsector_t *sub)
 					dVTX[0]->v.u = dVTX[3]->v.u = all_u[lump] + (((float)spos - 0.5f)*inv1024);
 				}
 
-				theheader = headers_for_sprites[lump];
+				if (!VideoFilter) {
+					theheader = &pvr_sprite_hdr;
+				} else {
+					theheader = &pvr_sprite_hdr_nofilter;
+				}
+
 				dVTX[0]->v.v = dVTX[1]->v.v = all_v[lump] + halfinv1024;
 				dVTX[3]->v.v = dVTX[2]->v.v = all_v[lump] + (((float)height-0.5f)*inv1024);
 			} else {
@@ -1742,8 +1660,8 @@ void R_RenderLaser(mobj_t *thing)
 	memcpy(&(dT2.dVerts[1]), &laserverts[4], sizeof(d64Vertex_t));
 	memcpy(&(dT2.dVerts[2]), &laserverts[5], sizeof(d64Vertex_t));
 
-	clip_triangle(&dT1, &hdr, 255, PVR_LIST_TR_POLY, 0);
-	clip_triangle(&dT2, &hdr, 255, PVR_LIST_TR_POLY, 0);
+	clip_triangle(&dT1, &hdr, 255, PVR_LIST_OP_POLY, 0);
+	clip_triangle(&dT2, &hdr, 255, PVR_LIST_OP_POLY, 0);
 }
 
 void R_RenderPSprites(void)
@@ -1854,7 +1772,11 @@ void R_RenderPSprites(void)
 			vert->u = u2 - halfinv1024;
 			vert->v = v1 + halfinv1024;
 
-			pvr_list_prim(PVR_LIST_TR_POLY, headers_for_sprites[lump], sizeof(pvr_poly_hdr_t));
+			if (!VideoFilter) {
+				pvr_list_prim(PVR_LIST_TR_POLY, &pvr_sprite_hdr, sizeof(pvr_poly_hdr_t));
+			} else {
+				pvr_list_prim(PVR_LIST_TR_POLY, &pvr_sprite_hdr_nofilter, sizeof(pvr_poly_hdr_t));
+			}
 			pvr_list_prim(PVR_LIST_TR_POLY, &quad2, sizeof(quad2));
 		} // if ((state = psp->state) != 0)
 	} // for i < numsprites
