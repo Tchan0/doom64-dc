@@ -1,14 +1,14 @@
 #include "doomdef.h"
 #include "p_local.h"
 
-fixed_t sightzstart;            //800A5F20 // eye z of looker
-fixed_t topslope, bottomslope;	//800A5F24 ,800A5F28 // slopes to top and bottom of target
+fixed_t sightzstart; //800A5F20 // eye z of looker
+fixed_t topslope,
+	bottomslope; //800A5F24 ,800A5F28 // slopes to top and bottom of target
 
-divline_t strace;				//800A5F30 // from t1 to t2
-fixed_t t2x, t2y;				//800A5F40, 800A5F44
+divline_t strace; //800A5F30 // from t1 to t2
+fixed_t t2x, t2y; //800A5F40, 800A5F44
 
-int t1xs,t1ys,t2xs,t2ys;        //800A5F48,800A5F4C,800A5F50,800A5F54
-
+int t1xs, t1ys, t2xs, t2ys; //800A5F48,800A5F4C,800A5F50,800A5F54
 
 /*
 ===============
@@ -19,13 +19,17 @@ int t1xs,t1ys,t2xs,t2ys;        //800A5F48,800A5F4C,800A5F50,800A5F54
 = tic and have MF_COUNTKILL set
 ===============
 */
-
+boolean PS_CrossBSPNode(int bspnum);
 void P_CheckSights(void) // 8001EB00
 {
 	mobj_t *mobj;
 
-	for (mobj = mobjhead.next; mobj != &mobjhead; mobj = mobj->next)
-	{
+	for (mobj = mobjhead.next; mobj != &mobjhead; mobj = mobj->next) {
+		if (!mobj) {
+			dbgio_printf("P_CheckSights: NULL mobj\n");
+			return;
+		}
+
 		// must be killable
 		if (!(mobj->flags & MF_COUNTKILL))
 			continue;
@@ -45,7 +49,6 @@ void P_CheckSights(void) // 8001EB00
 	}
 }
 
-
 /**********************************
 
 Returns true if a straight line between t1 and t2 is unobstructed
@@ -54,20 +57,20 @@ Returns true if a straight line between t1 and t2 is unobstructed
 
 boolean P_CheckSight(mobj_t *t1, mobj_t *t2) // 8001EBCC
 {
-	int	s1, s2;
-	int	pnum, bytenum, bitnum;
+	int s1, s2;
+	int pnum, bytenum, bitnum;
 
 	//
 	// check for trivial rejection
 	//
 	s1 = (t1->subsector->sector - sectors);
 	s2 = (t2->subsector->sector - sectors);
-	pnum = s1*numsectors + s2;
+	pnum = s1 * numsectors + s2;
 	bytenum = pnum >> 3;
 	bitnum = 1 << (pnum & 7);
 
 	if (rejectmatrix[bytenum] & bitnum) {
-		return false;	// can't possibly be connected
+		return false; // can't possibly be connected
 	}
 
 	// look from eyes of t1 to any part of t2
@@ -108,8 +111,9 @@ boolean P_CheckSight(mobj_t *t1, mobj_t *t2) // 8001EBCC
 = the sight.
 =================
 */
+extern fixed_t FixedDivFloat(register fixed_t a, register fixed_t b);
 
-fixed_t PS_SightCrossLine (line_t *line) // 8001EDD8
+fixed_t /* __attribute__((noinline)) */ PS_SightCrossLine(line_t *line) // 8001EDD8
 {
 	int s1, s2;
 
@@ -151,7 +155,11 @@ fixed_t PS_SightCrossLine (line_t *line) // 8001EDD8
 
 	s2 = (ndx * dx) + (ndy * dy); // distance projected onto normal
 
-	s2 = FixedDiv(s1, (s1 + s2));
+//	if ((s1 + s2) == 0.0f) {
+//		I_Error("PS_CrossSightLine div by zero");
+//	}
+
+	s2 = FixedDivFloat(s1, (s1+s2)); //FixedDiv(s1, (s1 + s2));
 
 	return s2;
 }
@@ -165,14 +173,14 @@ fixed_t PS_SightCrossLine (line_t *line) // 8001EDD8
 =================
 */
 
-boolean PS_CrossSubsector(subsector_t *sub) // 8001EF10
+boolean /* __attribute__((noinline)) */ PS_CrossSubsector(subsector_t *sub) // 8001EF10
 {
-	seg_t		*seg;
-	line_t		*line;
-	int			count;
-	sector_t	*front, *back;
-	fixed_t		opentop, openbottom;
-	fixed_t		frac, slope;
+	seg_t *seg;
+	line_t *line;
+	int count;
+	sector_t *front, *back;
+	fixed_t opentop, openbottom;
+	fixed_t frac, slope;
 
 	//
 	// check lines
@@ -180,16 +188,21 @@ boolean PS_CrossSubsector(subsector_t *sub) // 8001EF10
 	count = sub->numlines;
 	seg = &segs[sub->firstline];
 
-	for ( ; count ; seg++, count--) {
+	for (; count; seg++, count--) {
 		line = seg->linedef;
 
+		if (!line) {
+			I_Error("PS_CrossSubsector line was NULL");
+		}
+
 		if (line->validcount == validcount)
-			continue;		// allready checked other side
+			continue; // allready checked other side
+
 		line->validcount = validcount;
 
-		frac = PS_SightCrossLine (line);
+		frac = PS_SightCrossLine(line);
 
-		if (frac < 4 || frac >= (FRACUNIT+1))
+		if (frac < 4 || frac >= (FRACUNIT + 1))
 			continue;
 
 		//
@@ -197,12 +210,13 @@ boolean PS_CrossSubsector(subsector_t *sub) // 8001EF10
 		//
 		back = line->backsector;
 		if (!back)
-			return false;	// one sided line
+			return false; // one sided line
 		front = line->frontsector;
 
-		if (front->floorheight == back->floorheight
-		&& front->ceilingheight == back->ceilingheight)
-			continue;		// no wall to block sight with
+		if (/* __builtin_expect */(front->floorheight == back->floorheight && 
+							front->ceilingheight == back->ceilingheight/* , 1 */)) {
+			continue; // no wall to block sight with
+		}
 
 		if (front->ceilingheight < back->ceilingheight)
 			opentop = front->ceilingheight;
@@ -213,28 +227,30 @@ boolean PS_CrossSubsector(subsector_t *sub) // 8001EF10
 		else
 			openbottom = back->floorheight;
 
-		if (openbottom >= opentop)	// quick test for totally closed doors
-			return false;	// stop
+		// quick test for totally closed doors
+		if (/* __builtin_expect */(openbottom >= opentop/*, 0*/)) {
+			return false; // stop
+		}
 
-		frac >>= 2;
+		frac = frac >> 2;
 
-		if (front->floorheight != back->floorheight) {
-			slope =  (((openbottom - sightzstart) << 6) / frac) << 8;
+		if (/* __builtin_expect( */(front->floorheight != back->floorheight)/* ,0) */) {
+			slope = (((openbottom - sightzstart) << 6) / frac) << 8;
 			if (slope > bottomslope)
 				bottomslope = slope;
 		}
 
-		if (front->ceilingheight != back->ceilingheight) {
+		if (/* __builtin_expect( */(front->ceilingheight != back->ceilingheight)/* ,0) */) {
 			slope = (((opentop - sightzstart) << 6) / frac) << 8;
 			if (slope < topslope)
 				topslope = slope;
 		}
 
 		if (topslope <= bottomslope)
-			return false;	// stop
+			return false; // stop
 	}
 
-	return true;			// passed the subsector ok
+	return true; // passed the subsector ok
 }
 
 /*
@@ -245,12 +261,12 @@ boolean PS_CrossSubsector(subsector_t *sub) // 8001EF10
 = Returns true if strace crosses the given node successfuly
 =================
 */
-
+#if 0
 boolean PS_CrossBSPNode(int bspnum) // 8001F15C
 {
-	node_t  *bsp;
-	int     side1, side2;
-	int     bsp_num;
+	node_t *bsp;
+	int side1, side2;
+	int bsp_num;
 	fixed_t dx, dy;
 	fixed_t left, right;
 
@@ -258,7 +274,8 @@ boolean PS_CrossBSPNode(int bspnum) // 8001F15C
 		bsp_num = (bspnum & ~NF_SUBSECTOR);
 #if RANGECHECK
 		if (bsp_num >= numsubsectors) {
-			I_Error("PS_CrossSubsector: ss %i with numss = %i", bsp_num, numsubsectors);
+			I_Error("PS_CrossSubsector: ss %i with numss = %i",
+				bsp_num, numsubsectors);
 		}
 #endif
 		return PS_CrossSubsector(&subsectors[bsp_num]);
@@ -272,10 +289,10 @@ boolean PS_CrossBSPNode(int bspnum) // 8001F15C
 	dx = (strace.x - bsp->line.x);
 	dy = (strace.y - bsp->line.y);
 
-	left  = (bsp->line.dy>>FRACBITS) * (dx>>FRACBITS);
-	right = (dy>>FRACBITS) * (bsp->line.dx>>FRACBITS);
+	left = (bsp->line.dy >> FRACBITS) * (dx >> FRACBITS);
+	right = (dy >> FRACBITS) * (bsp->line.dx >> FRACBITS);
 
-	if(right < left)
+	if (right < left)
 		side1 = 0; // front side
 
 	// cross the starting side
@@ -288,15 +305,91 @@ boolean PS_CrossBSPNode(int bspnum) // 8001F15C
 	dx = (t2x - bsp->line.x);
 	dy = (t2y - bsp->line.y);
 
-	left  = (bsp->line.dy>>FRACBITS) * (dx>>FRACBITS);
-	right = (dy>>FRACBITS) * (bsp->line.dx>>FRACBITS);
+	left = (bsp->line.dy >> FRACBITS) * (dx >> FRACBITS);
+	right = (dy >> FRACBITS) * (bsp->line.dx >> FRACBITS);
 
-	if(right < left)
-		side2 = 0;    // front side
+	if (right < left)
+		side2 = 0; // front side
 
 	if (side1 == side2)
 		return true; // the line doesn't touch the other side
 
 	// cross the ending side
 	return PS_CrossBSPNode(bsp->children[side1 ^ 1]);
+}
+#endif
+
+#define BSP_STACK_SIZE 512
+static int stack[BSP_STACK_SIZE];
+
+boolean PS_CrossBSPNode(int bspnum)
+{
+	size_t stack_top = 0;
+ 
+	// Push the initial node onto the stack
+	stack[stack_top++] = bspnum;
+
+	while (stack_top > 0) {
+		// Pop the top element
+		int current_bspnum = stack[--stack_top];
+
+		// Check if it's a subsector
+		if (current_bspnum & NF_SUBSECTOR) {
+			int bsp_num = (current_bspnum & ~NF_SUBSECTOR);
+			if (bsp_num >= numsubsectors) {
+				I_Error("PS_CrossSubsector: ss %i with numss = %i", bsp_num, numsubsectors);
+			}
+
+			if (!PS_CrossSubsector(&subsectors[bsp_num])) {
+				return false;
+			}
+			continue;
+		}
+
+		node_t *bsp = &nodes[current_bspnum];
+
+		// Decide which side the start point is on
+		int side1 = 1;
+		fixed_t dx = (strace.x - bsp->line.x);
+		fixed_t dy = (strace.y - bsp->line.y);
+
+		fixed_t left = (bsp->line.dy >> FRACBITS) * (dx >> FRACBITS);
+		fixed_t right = (dy >> FRACBITS) * (bsp->line.dx >> FRACBITS);
+
+		if (right < left) {
+			side1 = 0; // front side
+		}
+
+		// Push the starting side onto the stack
+		if (stack_top >= BSP_STACK_SIZE) {
+			// overflowed stack, give up
+			return false;
+		}
+
+ 		stack[stack_top++] = bsp->children[side1];
+
+		// Determine which side the endpoint is on
+		int side2 = 1;
+		dx = (t2x - bsp->line.x);
+		dy = (t2y - bsp->line.y);
+
+		left = (bsp->line.dy >> FRACBITS) * (dx >> FRACBITS);
+		right = (dy >> FRACBITS) * (bsp->line.dx >> FRACBITS);
+
+		if (right < left) {
+			side2 = 0; // front side
+		}
+
+		// If the line doesn't touch the other side, skip
+		if (side1 != side2) {
+			if (stack_top >= BSP_STACK_SIZE) {
+				// overflowed stack, give up
+				return false;
+			}
+
+			stack[stack_top++] = bsp->children[side1 ^ 1];
+		}
+	}
+
+	return true;
 }

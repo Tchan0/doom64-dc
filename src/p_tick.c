@@ -17,8 +17,9 @@ processing
 ===============================================================================
 */
 
-thinker_t	thinkercap;	/* both the head and tail of the thinker list */    //80096378
-mobj_t		mobjhead;	/* head and tail of mobj list */                    //800A8C74,
+thinker_t thinkercap;
+/* both the head and tail of the thinker list */ //80096378
+mobj_t mobjhead; /* head and tail of mobj list */ //800A8C74,
 
 /*
 ===============
@@ -30,7 +31,7 @@ mobj_t		mobjhead;	/* head and tail of mobj list */                    //800A8C74
 ===============
 */
 
-void P_AddThinker (thinker_t *thinker)
+void P_AddThinker(thinker_t *thinker)
 {
 	thinkercap.prev->next = thinker;
 	thinker->next = &thinkercap;
@@ -49,7 +50,7 @@ void P_AddThinker (thinker_t *thinker)
 ===============
 */
 
-void P_RemoveThinker (thinker_t *thinker)
+void P_RemoveThinker(thinker_t *thinker)
 {
 	thinker->function = (think_t)-1;
 
@@ -67,21 +68,24 @@ void P_RemoveThinker (thinker_t *thinker)
 ===============
 */
 
-void P_RunThinkers (void)
+void P_RunThinkers(void)
 {
-	thinker_t	*currentthinker;
+	thinker_t *currentthinker;
 
 	currentthinker = thinkercap.next;
 	if (thinkercap.next != &thinkercap) {
 		while (currentthinker != &thinkercap) {
 			if (currentthinker->function == (think_t)-1) {
 				// time to remove it
-				currentthinker->next->prev = currentthinker->prev;
-				currentthinker->prev->next = currentthinker->next;
-				Z_Free (currentthinker);
+				currentthinker->next->prev =
+					currentthinker->prev;
+				currentthinker->prev->next =
+					currentthinker->next;
+				Z_Free(currentthinker);
 			} else {
 				if (currentthinker->function) {
-					currentthinker->function (currentthinker);
+					currentthinker->function(
+						currentthinker);
 				}
 			}
 			currentthinker = currentthinker->next;
@@ -97,7 +101,7 @@ void P_RunThinkers (void)
 ==============
 */
 #define NUM_MENU_GAME 5
-void P_CheckCheats (void)
+void P_CheckCheats(void)
 {
 	unsigned int buttons;
 	int exit;
@@ -119,7 +123,7 @@ void P_CheckCheats (void)
 			if (FeaturesUnlocked == false)
 				itemlines = NUM_MENU_GAME - 1;
 			else
-				itemlines = NUM_MENU_GAME;  // Enable cheat menu
+				itemlines = NUM_MENU_GAME; // Enable cheat menu
 
 			MenuIdx = 0;
 			text_alpha = 255;
@@ -148,7 +152,7 @@ void P_CheckCheats (void)
 	}
 }
 
-void G_DoReborn (int playernum);//extern
+void G_DoReborn(int playernum); //extern
 
 /*
 =================
@@ -159,10 +163,11 @@ void G_DoReborn (int playernum);//extern
 */
 
 //extern functions
-void P_CheckSights (void);
-void P_RunMobjBase (void);
+void P_CheckSights(void);
+void P_RunMobjBase(void);
 
-int P_Ticker (void)//80021A00
+
+int P_Ticker(void) //80021A00
 {
 	player_t *pl;
 
@@ -173,9 +178,9 @@ int P_Ticker (void)//80021A00
 	//
 	P_CheckCheats();
 
-	if ((!gamepaused) && (gamevbls < gametic))
-	{
-	    P_RunThinkers();
+//	if ((!gamepaused) && (gamevbls < gametic)) {
+	if ((!gamepaused) && ((int)f_gamevbls < (int)f_gametic)) {
+		P_RunThinkers();
 		P_CheckSights();
 		P_RunMobjBase();
 
@@ -196,6 +201,7 @@ int P_Ticker (void)//80021A00
 	AM_Control(pl);
 	P_PlayerThink(pl);
 
+
 	return gameaction; // may have been set to ga_died, ga_completed, or ga_secretexit
 }
 
@@ -211,14 +217,14 @@ int P_Ticker (void)//80021A00
 extern Matrix __attribute__((aligned(32))) R_ProjectionMatrix;
 extern Matrix __attribute__((aligned(32))) R_ModelMatrix;
 
-void P_Drawer (void) // 80021AC8
+void P_Drawer(void) // 80021AC8
 {
 	I_ClearFrame();
 
 	mat_load(&R_ProjectionMatrix);
 	mat_apply(&R_ModelMatrix);
 
-	if (players[0].automapflags & (AF_LINES|AF_SUBSEC)) {
+	if (players[0].automapflags & (AF_LINES | AF_SUBSEC)) {
 		AM_Drawer();
 	} else {
 		R_RenderPlayerView();
@@ -236,16 +242,16 @@ void P_Drawer (void) // 80021AC8
 }
 
 extern void T_FadeInBrightness(fadebright_t *fb);
-extern int start_time;  // 80063390
-extern int end_time;    // 80063394
+extern int start_time; // 80063390
+extern int end_time; // 80063394
 
-void P_Start (void) // 80021C50
+void P_Start(void) // 80021C50
 {
 	fadebright_t *fb;
 
 	DrawerStatus = 1;
 
-	if (gamemap == 33) {  /* Add by default God Mode in player  */
+	if (gamemap == 33) { /* Add by default God Mode in player  */
 		players[0].cheats |= CF_GODMODE;
 	} else if (gamemap == 32) {
 		/* Remove by default God Mode in player  */
@@ -268,31 +274,29 @@ void P_Start (void) // 80021C50
 
 	start_time = ticon;
 
-	MusicID = MapInfo[gamemap].MusicSeq-92;
+	MusicID = MapInfo[gamemap].MusicSeq - 92;
 	S_StartMusic(MapInfo[gamemap].MusicSeq);
+	
+	S_SetSoundVolume(menu_settings.SfxVolume);
+	S_SetMusicVolume(menu_settings.MusVolume);
 }
 
 extern int plasma_channel;
 extern int plasma_loop_channel;
 
-extern int lump_frame[(575+310)];
-extern int used_lumps[(575+310)];
-extern int used_lump_idx;
-extern int del_idx;
-extern int donebefore;
-extern pvr_ptr_t pvr_troo[MAX_CACHED_SPRITES];
-
-void P_Stop (int exit) // 80021D58
+void P_Stop(int exit) // 80021D58
 {
 	/* [d64] stop plasma buzz */
-//	S_StopSound(0, sfx_electric);
+	//	S_StopSound(0, sfx_electric);
+#ifdef DCLOAD
+#else
 	if (plasma_channel != -1)
 		snd_sfx_stop(plasma_channel);
 	if (plasma_loop_channel != -1)
 		snd_sfx_stop(plasma_loop_channel);
+#endif
 	plasma_channel = -1;
 	plasma_loop_channel = -1;
-
 
 	end_time = ticon;
 	gamepaused = false;
@@ -308,18 +312,6 @@ void P_Stop (int exit) // 80021D58
 
 	S_ResetSound();
 
-	if (donebefore) {
-		for (int i=0;i<(575+310);i++) {
-			if (used_lumps[i] != -1) {
-				pvr_mem_free(pvr_troo[used_lumps[i]]);
-			}
-		}
-	}
-	memset(used_lumps, 0xff, sizeof(int)*(575+310));
-	memset(lump_frame, 0xff, sizeof(int)*(575+310));
-	used_lump_idx = 0;
-	del_idx = 0;
-
 	if ((demoplayback) && (exit == 8))
 		I_WIPE_FadeOutScreen();
 	else
@@ -327,5 +319,3 @@ void P_Stop (int exit) // 80021D58
 
 	S_StopAll();
 }
-
-
